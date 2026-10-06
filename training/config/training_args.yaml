@@ -1,0 +1,32 @@
+data:
+  train_file: data/splits/train.jsonl
+  val_file: data/splits/val.jsonl
+  extra_train_files: []        # e.g. [data/splits/train_synthetic.jsonl]
+
+early_stopping_patience: 3
+
+args:
+  output_dir: data/checkpoints
+  num_train_epochs: 3
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0002
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  max_grad_norm: 0.3
+  optim: paged_adamw_8bit
+  bf16: true
+  gradient_checkpointing: true
+  logging_steps: 10
+  eval_strategy: steps
+  eval_steps: 100
+  save_strategy: steps
+  save_steps: 100
+  save_total_limit: 2
+  load_best_model_at_end: true
+  metric_for_best_model: eval_loss
+  greater_is_better: false
+  report_to: none
+  seed: 42
