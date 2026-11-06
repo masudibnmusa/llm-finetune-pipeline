@@ -48,22 +48,27 @@ Collect and clean domain data → format as instruction-response pairs → fine-
 
 ### Data Flow
 
-```
-Raw domain data → collectors/ → cleaning/ (PII scrub, dedup, quality filter)
-                                      ↓
-                        formatting/ (instruction format + chat template)
-                                      ↓
-                        dataset_splitter.py → train/val/test.jsonl
-                                      ↓
-                        training/train.py (LoRA/QLoRA fine-tuning)
-                                      ↓
-                        evaluation/benchmark_runner.py (vs base model)
-                                      ↓
-                        export/merge_adapters.py → quantize.py
-                                      ↓
-                        serving/inference_server.py (deployed model)
-                                      ↓
-                        monitoring/usage_logger.py → feeds next training round
+```mermaid
+flowchart TD
+    A[("Raw domain data<br/>legal · medical · support")] --> B["<b>collectors/</b><br/>legal · medical · support ticket"]
+    B --> C["<b>cleaning/</b><br/>PII scrub · dedup · quality filter"]
+    C --> D["<b>formatting/</b><br/>instruction format + chat template"]
+    D --> E["<b>dataset_splitter.py</b>"]
+    E --> F[("train / val / test.jsonl")]
+    F --> G["<b>training/train.py</b><br/>LoRA / QLoRA fine-tuning"]
+    G --> H["<b>evaluation/benchmark_runner.py</b><br/>fine-tuned vs base model"]
+    H --> I["<b>export/merge_adapters.py</b>"]
+    I --> J["<b>export/quantize.py</b><br/>GGUF · AWQ · GPTQ"]
+    J --> K["<b>serving/inference_server.py</b><br/>deployed model"]
+    K --> L["<b>monitoring/usage_logger.py</b><br/>+ drift_detector.py"]
+    L -. "new examples feed<br/>next training round" .-> B
+
+    classDef data fill:#e8f1fb,stroke:#3b78c2,color:#1b3a5c
+    classDef train fill:#fdf0e3,stroke:#d9822b,color:#5c3510
+    classDef deploy fill:#e7f6ec,stroke:#2f9e5a,color:#164d2b
+    class A,B,C,D,E,F data
+    class G,H train
+    class I,J,K,L deploy
 ```
 
 ---
@@ -195,35 +200,35 @@ This produces `data/splits/train.jsonl`, `val.jsonl`, and `test.jsonl`.
 ```bash
 bash run_training.sh
 # or
-python training/train.py --config training/config/training_args.yaml
+python training/train.py --config_dir training/config
 ```
 
 For multi-GPU setups:
 
 ```bash
-accelerate launch training/train.py
+accelerate launch --num_processes <num-gpus> training/train.py
 ```
 
 ### 3. Evaluate
 
 ```bash
-python evaluation/benchmark_runner.py --model <path-to-adapter> --base <base-model>
-python evaluation/comparison_report.py
+python evaluation/benchmark_runner.py --base <base-model> --adapter data/checkpoints/final
+python evaluation/comparison_report.py          # add --judge for LLM-as-judge scores
 ```
 
 ### 4. Export
 
 ```bash
-python export/merge_adapters.py
+python export/merge_adapters.py --base <base-model>
 python export/quantize.py --format gguf
-python export/push_to_hub.py     # optional
+python export/push_to_hub.py --repo_id <username>/<repo-name>     # optional
 ```
 
 ### 5. Serve
 
 ```bash
-python serving/inference_server.py
-python serving/api.py
+python serving/inference_server.py              # starts vLLM on port 8000
+uvicorn serving.api:app --port 8080            # REST API in front of it
 ```
 
 ---
