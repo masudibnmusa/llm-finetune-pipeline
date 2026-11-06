@@ -22,3 +22,11 @@ def test_record_skips_domain_key():
     out = scrub_record(rec)
     assert out["domain"] == "legal"
     assert "[EMAIL]" in out["text"]
+
+def test_credit_card():
+    assert scrub_text("card 4111 1111 1111 1111 ok") == "card [CREDIT_CARD] ok"
+    assert scrub_text("card 4111-1111-1111-1111.") == "card [CREDIT_CARD]."
+
+
+def test_credit_card_ignores_non_card_numbers():
+    assert scrub_text("years 1990 1991 1992 1993") == "years 1990 1991 1992 1993"
