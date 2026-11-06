@@ -6,6 +6,7 @@ import json
 import os
 import random
 import re
+from collections import defaultdict
 
 import anthropic
 from dotenv import load_dotenv
@@ -28,11 +29,19 @@ def generate(train_path, out_path, per_call, calls, seed):
     rng = random.Random(seed)
     with open(train_path, encoding="utf-8") as f:
         rows = [json.loads(l) for l in f]
+    by_domain = defaultdict(list)
+    for r in rows:
+        by_domain[r.get("domain", "unknown")].append(r)
+    if not by_domain:
+        raise SystemExit(f"No training rows found in {train_path}")
+    domains = sorted(by_domain)
 
     new_rows = []
     for _ in range(calls):
-        sample = rng.sample(rows, k=min(3, len(rows)))
-        domain = sample[0]["domain"]
+        # Keep all few-shot examples in one domain so the generated rows match their label
+        domain = rng.choice(domains)
+        pool = by_domain[domain]
+        sample = rng.sample(pool, k=min(3, len(pool)))
         examples = json.dumps(
             [{k: s[k] for k in ("instruction", "input", "output")} for s in sample],
             indent=2,
@@ -43,13 +52,14 @@ def generate(train_path, out_path, per_call, calls, seed):
             messages=[{"role": "user", "content": PROMPT.format(
                 domain=domain, examples=examples, n=per_call)}],
         )
-        text = msg.content[0].text
+        text = "".join(b.text for b in msg.content if b.type == "text")
         match = re.search(r"\[.*\]", text, re.DOTALL)
         if not match:
             continue
         try:
             for item in json.loads(match.group(0)):
-                if all(k in item for k in ("instruction", "input", "output")):
+                if isinstance(item, dict) and all(
+                        isinstance(item.get(k), str) for k in ("instruction", "input", "output")):
                     item["domain"] = domain
                     new_rows.append(item)
         except json.JSONDecodeError:
