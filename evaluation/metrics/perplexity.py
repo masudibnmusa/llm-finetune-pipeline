@@ -37,7 +37,8 @@ if __name__ == "__main__":
     a = p.parse_args()
 
     model, tok = load_models(a.base, a.adapter, load_4bit=True)
-    ds = load_dataset("json", data_files=a.test, split="train").select(range(a.limit))
+    ds = load_dataset("json", data_files=a.test, split="train")
+    ds = ds.select(range(min(a.limit, len(ds))))
     texts = [apply_chat_template(ex, tok)["text"] for ex in ds]
 
     ft = compute_perplexity(model, tok, texts)

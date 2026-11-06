@@ -15,7 +15,7 @@ def main(results_path, out_path, use_judge, judge_limit):
 
     by_domain = defaultdict(list)
     for r in rows:
-        by_domain[r.get("domain", "all")].append(r)
+        by_domain[r.get("domain") or "unknown"].append(r)
     by_domain["ALL"] = rows
 
     lines = ["# Fine-tuned vs Base Model\n"]

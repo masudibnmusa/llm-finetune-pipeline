@@ -41,7 +41,7 @@ def judge(task: str, reference: str, response: str) -> dict:
         messages=[{"role": "user", "content": RUBRIC.format(
             task=task, reference=reference, response=response)}],
     )
-    text = msg.content[0].text
+    text = "".join(b.text for b in msg.content if b.type == "text")
     match = re.search(r"\{.*\}", text, re.DOTALL)
     try:
         return json.loads(match.group(0))
@@ -55,4 +55,5 @@ def mean_judge_score(tasks, references, responses) -> float:
         s = judge(t, ref, resp).get("score")
         if isinstance(s, (int, float)):
             scores.append(s)
-    return sum(scores) / max(len(scores), 1)
+    # NaN rather than 0 so a failed run can't be mistaken for a terrible score
+    return sum(scores) / len(scores) if scores else float("nan")

@@ -2,6 +2,7 @@
 import argparse
 import json
 import random
+from pathlib import Path
 
 import gradio as gr
 
@@ -21,14 +22,18 @@ def build_ui(rows, out_path):
         return r["prompt_text"], a, b, i
 
     def vote(choice, i):
-        if i < len(rows) and choice:
-            if choice == "Tie":
-                winner = "tie"
-            else:
-                winner = "finetuned" if (choice == "A") == ft_first[i] else "base"
-            with open(out_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({"index": i, "winner": winner}) + "\n")
-        return show(i + 1)
+        if i >= len(rows):
+            return (*show(i), None)
+        if not choice:
+            gr.Warning("Pick A, B, or Tie before submitting.")
+            return (*show(i), None)
+        if choice == "Tie":
+            winner = "tie"
+        else:
+            winner = "finetuned" if (choice == "A") == ft_first[i] else "base"
+        with open(out_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"index": i, "winner": winner}) + "\n")
+        return (*show(i + 1), None)
 
     with gr.Blocks(title="Human Evaluation") as demo:
         gr.Markdown("## Which response is better? (blind A/B)")
@@ -41,7 +46,7 @@ def build_ui(rows, out_path):
         submit = gr.Button("Submit")
 
         demo.load(lambda: show(0), outputs=[prompt, a_box, b_box, idx])
-        submit.click(vote, [choice, idx], [prompt, a_box, b_box, idx])
+        submit.click(vote, [choice, idx], [prompt, a_box, b_box, idx, choice])
     return demo
 
 
@@ -53,4 +58,5 @@ if __name__ == "__main__":
     a = p.parse_args()
     with open(a.results, encoding="utf-8") as f:
         rows = [json.loads(l) for l in f][: a.limit]
+    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     build_ui(rows, a.out).launch()
