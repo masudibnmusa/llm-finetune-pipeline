@@ -5,6 +5,7 @@ GGUF needs a local llama.cpp checkout and build:
 """
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -13,7 +14,7 @@ def to_gguf(model_dir: str, out_dir: str, llama_cpp: str, quant: str):
     f16 = f"{out_dir}/model-f16.gguf"
     final = f"{out_dir}/model-{quant}.gguf"
     subprocess.run(
-        ["python", f"{llama_cpp}/convert_hf_to_gguf.py", model_dir,
+        [sys.executable, f"{llama_cpp}/convert_hf_to_gguf.py", model_dir,
          "--outfile", f16, "--outtype", "f16"],
         check=True,
     )
