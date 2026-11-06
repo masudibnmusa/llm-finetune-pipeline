@@ -1,6 +1,7 @@
 """LoRA / QLoRA fine-tuning with TRL's SFTTrainer.
 Usage: python training/train.py   (or: accelerate launch training/train.py)"""
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def main(cfg_dir: str):
 
     # Data
     data_cfg = train_cfg["data"]
-    train_files = [data_cfg["train_file"]] + data_cfg.get("extra_train_files", [])
+    train_files = [data_cfg["train_file"]] + (data_cfg.get("extra_train_files") or [])
     train_parts = [load_dataset("json", data_files=f, split="train") for f in train_files]
     train_ds = concatenate_datasets(train_parts)
     val_ds = load_dataset("json", data_files=data_cfg["val_file"], split="train")
@@ -56,11 +57,17 @@ def main(cfg_dir: str):
             bnb_4bit_compute_dtype=getattr(torch, q.get("bnb_4bit_compute_dtype", "bfloat16")),
             bnb_4bit_use_double_quant=q.get("bnb_4bit_use_double_quant", True),
         )
+    # Under `accelerate launch` (DDP) each process must hold a full copy of the model
+    # on its own GPU; device_map="auto" would split it across GPUs and break DDP.
+    if int(os.environ.get("WORLD_SIZE", "1")) > 1:
+        device_map = {"": int(os.environ.get("LOCAL_RANK", "0"))}
+    else:
+        device_map = "auto"
     model = AutoModelForCausalLM.from_pretrained(
         base,
         quantization_config=bnb_config,
         torch_dtype=torch.bfloat16,
-        device_map="auto",
+        device_map=device_map,
     )
     if bnb_config is not None:
         model = prepare_model_for_kbit_training(model)
@@ -87,9 +94,10 @@ def main(cfg_dir: str):
     trainer.train()
 
     final_dir = f"{train_cfg['args']['output_dir']}/final"
-    trainer.model.save_pretrained(final_dir)
-    tokenizer.save_pretrained(final_dir)
-    print(f"Saved LoRA adapter to {final_dir}")
+    trainer.save_model(final_dir)  # only saves on the main process in multi-GPU runs
+    if trainer.is_world_process_zero():
+        tokenizer.save_pretrained(final_dir)
+        print(f"Saved LoRA adapter to {final_dir}")
 
 
 if __name__ == "__main__":
