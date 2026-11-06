@@ -26,11 +26,14 @@ def format_record(rec: dict):
     spec = DOMAIN_SPECS.get(rec.get("domain"))
     if not spec:
         return None
+    inp, out = rec.get(spec["input"]), rec.get(spec["output"])
+    if not isinstance(inp, str) or not isinstance(out, str) or not inp.strip() or not out.strip():
+        return None
     return {
         "domain": rec["domain"],
         "instruction": spec["instruction"],
-        "input": rec[spec["input"]].strip(),
-        "output": rec[spec["output"]].strip(),
+        "input": inp.strip(),
+        "output": out.strip(),
     }
 
 

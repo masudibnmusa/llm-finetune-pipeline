@@ -15,10 +15,17 @@ def to_messages(ex: dict, include_answer: bool = True) -> list:
 
 
 def apply_chat_template(ex: dict, tokenizer) -> dict:
-    """For training: returns {'text': full conversation string}."""
+    """For training: returns {'text': full conversation string}.
+
+    The leading BOS token is stripped because the tokenizer adds its own BOS when
+    this text is tokenized (by SFTTrainer or perplexity), which would otherwise
+    produce a double BOS."""
     text = tokenizer.apply_chat_template(
         to_messages(ex, include_answer=True), tokenize=False
     )
+    bos = getattr(tokenizer, "bos_token", None)
+    if bos and text.startswith(bos):
+        text = text[len(bos):]
     return {"text": text}
 
 
